@@ -11,10 +11,8 @@ const form = document.getElementById('problemForm');
 const platformSelect = document.getElementById('platform');
 const problemNumberInput = document.getElementById('problemNumber');
 const problemNameInput = document.getElementById('problemName');
-const todoList = document.getElementById('todoList');
 const codeforcesList = document.getElementById('codeforcesList');
 const leetcodeList = document.getElementById('leetcodeList');
-const todoCount = document.getElementById('todoCount');
 const codeforcesCount = document.getElementById('codeforcesCount');
 const leetcodeCount = document.getElementById('leetcodeCount');
 const summaryTotal = document.getElementById('summaryTotal');
@@ -63,8 +61,7 @@ function loadState() {
         localStorage.removeItem(STORAGE_KEY);
         return {
           codeforces: [],
-          leetcode: [],
-          todo: []
+          leetcode: []
         };
       }
 
@@ -74,14 +71,10 @@ function loadState() {
       const leetcode = Array.isArray(parsed.leetcode)
         ? parsed.leetcode.map((item) => normalizeProblemEntry('leetcode', item))
         : [...defaultProblems.leetcode];
-      const todo = Array.isArray(parsed.todo)
-        ? parsed.todo.map((item) => normalizeProblemEntry(item.platform || 'codeforces', item))
-        : [];
 
       return {
         codeforces,
-        leetcode,
-        todo
+        leetcode
       };
     } catch (error) {
       console.warn('Could not parse saved state, resetting...', error);
@@ -90,8 +83,7 @@ function loadState() {
 
   return {
     codeforces: defaultProblems.codeforces.map((item) => normalizeProblemEntry('codeforces', item)),
-    leetcode: defaultProblems.leetcode.map((item) => normalizeProblemEntry('leetcode', item)),
-    todo: []
+    leetcode: defaultProblems.leetcode.map((item) => normalizeProblemEntry('leetcode', item))
   };
 }
 
@@ -100,34 +92,39 @@ function saveState() {
 }
 
 function createProblemUrl(platform, problemNumber, problemName) {
-  const cleanedNumber = String(problemNumber).trim();
-  const cleanedName = String(problemName).trim();
+  const cleanedNumber = String(problemNumber ?? '').trim();
+  const cleanedName = String(problemName ?? '').trim();
 
   if (platform === 'codeforces') {
-    const normalized = cleanedNumber.replace(/\s+/g, '');
-    const directMatch = normalized.match(/^(\d+)([A-Za-z])$/);
-    const slashMatch = normalized.match(/^(\d+)\/([A-Za-z])$/);
+    const normalized = cleanedNumber
+      .replace(/^(?:https?:\/\/)?(?:www\.)?codeforces\.com\/.*?problem(?:set)?\//i, '')
+      .replace(/[^A-Za-z0-9]/g, '')
+      .trim();
 
-    if (directMatch) {
-      return `https://codeforces.com/problemset/problem/${directMatch[1]}/${directMatch[2]}`;
+    if (/^\d+[A-Za-z]?$/.test(normalized)) {
+      return `https://codeforces.com/problemset/problem/${normalized}`;
     }
 
-    if (slashMatch) {
-      return `https://codeforces.com/problemset/problem/${slashMatch[1]}/${slashMatch[2]}`;
+    if (normalized) {
+      return `https://codeforces.com/problemset?search=${encodeURIComponent(normalized)}`;
     }
 
-    return `https://codeforces.com/problemset?search=${encodeURIComponent(normalized)}`;
+    if (cleanedName) {
+      return `https://codeforces.com/problemset?search=${encodeURIComponent(cleanedName)}`;
+    }
+
+    return 'https://codeforces.com/problemset';
   }
 
   const slug = cleanedName
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || `problem-${cleanedNumber}`;
+    .replace(/^-+|-+$/g, '') || `problem-${cleanedNumber || 'new'}`;
 
   return `https://leetcode.com/problems/${slug}/`;
 }
 
-function renderProblemList(listElement, problems) {
+function renderProblemList(listElement, problems, platform) {
   listElement.innerHTML = '';
 
   if (!problems.length) {
@@ -137,9 +134,13 @@ function renderProblemList(listElement, problems) {
 
   for (const item of problems) {
     const li = document.createElement('li');
+    li.className = `todo-item ${item.completed ? 'completed' : ''}`;
+
     const anchor = document.createElement('a');
     const tag = document.createElement('span');
-    const addBtn = document.createElement('button');
+    const actions = document.createElement('div');
+    const completeBtn = document.createElement('button');
+    const deleteBtn = document.createElement('button');
 
     anchor.href = item.url;
     anchor.target = '_blank';
@@ -147,28 +148,37 @@ function renderProblemList(listElement, problems) {
     anchor.className = 'problem-link';
 
     tag.className = 'problem-tag';
-    tag.textContent = item.problemNumber;
+    tag.textContent = platform === 'codeforces' ? 'CF' : 'LC';
 
     anchor.appendChild(tag);
-    anchor.appendChild(document.createTextNode(item.name));
+    anchor.appendChild(document.createTextNode(`${item.problemNumber} - ${item.name}`));
 
-    addBtn.type = 'button';
-    addBtn.textContent = 'Add to Todo';
-    addBtn.className = 'mini-btn';
-    addBtn.addEventListener('click', () => addToTodo(item, true));
+    completeBtn.type = 'button';
+    completeBtn.className = 'mini-btn';
+    completeBtn.textContent = item.completed ? 'Mark Open' : 'Complete';
+    completeBtn.addEventListener('click', () => toggleProblemCompletion(platform, item));
+
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'mini-btn delete';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => deletePlatformProblem(platform, item));
+
+    actions.className = 'todo-actions';
+    actions.appendChild(completeBtn);
+    actions.appendChild(deleteBtn);
 
     li.appendChild(anchor);
-    li.appendChild(addBtn);
+    li.appendChild(actions);
     listElement.appendChild(li);
   }
 }
 
 function renderSummary() {
-  const total = state.todo.length;
-  const solved = state.todo.filter((item) => item.completed).length;
-  const remaining = total - solved;
   const codeforcesTotal = state.codeforces.length;
   const leetcodeTotal = state.leetcode.length;
+  const total = codeforcesTotal + leetcodeTotal;
+  const solved = [...state.codeforces, ...state.leetcode].filter((item) => item.completed).length;
+  const remaining = total - solved;
   const maxValue = Math.max(total, solved, remaining, codeforcesTotal, leetcodeTotal, 1);
 
   summaryTotal.textContent = String(total);
@@ -176,134 +186,52 @@ function renderSummary() {
   summaryRemaining.textContent = String(remaining);
   summaryCodeforces.textContent = String(codeforcesTotal);
   summaryLeetcode.textContent = String(leetcodeTotal);
-  todoCount.textContent = String(total);
   codeforcesCount.textContent = String(codeforcesTotal);
   leetcodeCount.textContent = String(leetcodeTotal);
 
-  const setBar = (element, value, labelElement, labelValue) => {
+  const setBar = (element, value, labelValue) => {
     const percent = (value / maxValue) * 100;
     element.style.width = `${percent}%`;
     labelValue.textContent = String(value);
   };
 
-  setBar(barTotal, total, null, barTotalValue);
-  setBar(barSolved, solved, null, barSolvedValue);
-  setBar(barRemaining, remaining, null, barRemainingValue);
-  setBar(barCodeforces, codeforcesTotal, null, barCodeforcesValue);
-  setBar(barLeetcode, leetcodeTotal, null, barLeetcodeValue);
+  setBar(barTotal, total, barTotalValue);
+  setBar(barSolved, solved, barSolvedValue);
+  setBar(barRemaining, remaining, barRemainingValue);
+  setBar(barCodeforces, codeforcesTotal, barCodeforcesValue);
+  setBar(barLeetcode, leetcodeTotal, barLeetcodeValue);
 }
 
-function renderTodo() {
-  todoList.innerHTML = '';
-
-  if (!state.todo.length) {
-    todoList.innerHTML = '<li class="empty-state">Your todo list is empty.</li>';
-    renderSummary();
+function toggleProblemCompletion(platform, item) {
+  const pool = state[platform];
+  if (!Array.isArray(pool)) {
     return;
   }
 
-  for (const item of state.todo) {
-    const li = document.createElement('li');
-    li.className = `todo-item ${item.completed ? 'completed' : ''}`;
-
-    const main = document.createElement('div');
-    main.className = 'todo-main';
-
-    const status = document.createElement('span');
-    status.className = `status ${item.completed ? 'solved' : 'pending'}`;
-    status.textContent = item.completed ? 'Solved' : 'Open';
-
-    const anchor = document.createElement('a');
-    const tag = document.createElement('span');
-    anchor.href = item.url;
-    anchor.target = '_blank';
-    anchor.rel = 'noreferrer';
-    anchor.className = 'problem-link';
-
-    tag.className = 'problem-tag';
-    tag.textContent = item.platform === 'codeforces' ? 'CF' : 'LC';
-
-    anchor.appendChild(tag);
-    anchor.appendChild(document.createTextNode(`${item.problemNumber} - ${item.name}`));
-
-    main.appendChild(status);
-    main.appendChild(anchor);
-
-    const actions = document.createElement('div');
-    actions.className = 'todo-actions';
-
-    const completeBtn = document.createElement('button');
-    completeBtn.type = 'button';
-    completeBtn.className = 'mini-btn';
-    completeBtn.textContent = item.completed ? 'Mark Open' : 'Complete';
-    completeBtn.addEventListener('click', () => toggleTodoCompletion(item));
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.className = 'mini-btn delete';
-    deleteBtn.textContent = 'Delete';
-    deleteBtn.addEventListener('click', () => deleteTodo(item));
-
-    actions.appendChild(completeBtn);
-    actions.appendChild(deleteBtn);
-
-    li.appendChild(main);
-    li.appendChild(actions);
-    todoList.appendChild(li);
-  }
-
-  renderSummary();
-}
-
-function findTodoIndex(item) {
-  return state.todo.findIndex(
-    (entry) =>
-      entry.platform === item.platform &&
-      entry.problemNumber === item.problemNumber &&
-      entry.name === item.name &&
-      entry.url === item.url
-  );
-}
-
-function addToTodo(item, skipRender = false) {
-  const alreadyExists = state.todo.some(
+  const index = pool.findIndex(
     (entry) =>
       entry.platform === item.platform &&
       entry.problemNumber === item.problemNumber &&
       entry.name === item.name
   );
 
-  if (alreadyExists) {
-    return;
-  }
-
-  state.todo.unshift({
-    ...item,
-    platform: item.platform || 'codeforces',
-    completed: false
-  });
-  saveState();
-
-  if (!skipRender) {
+  if (index !== -1) {
+    pool[index].completed = !pool[index].completed;
+    saveState();
     renderAll();
-  } else {
-    renderTodo();
   }
 }
 
-function toggleTodoCompletion(item) {
-  const index = findTodoIndex(item);
-  if (index === -1) {
+function deletePlatformProblem(platform, item) {
+  const pool = state[platform];
+  if (!Array.isArray(pool)) {
     return;
   }
 
-  state.todo[index].completed = !state.todo[index].completed;
-  saveState();
-  renderTodo();
-}
+  state[platform] = pool.filter(
+    (entry) => !(entry.platform === item.platform && entry.problemNumber === item.problemNumber && entry.name === item.name)
+  );
 
-function deleteTodo(item) {
-  state.todo = state.todo.filter((entry) => !(entry.platform === item.platform && entry.problemNumber === item.problemNumber && entry.name === item.name && entry.url === item.url));
   saveState();
   renderAll();
 }
@@ -323,19 +251,31 @@ function addProblem(event) {
     platform,
     problemNumber,
     name,
-    url: createProblemUrl(platform, problemNumber, name)
+    url: createProblemUrl(platform, problemNumber, name),
+    completed: false
   };
 
+  const exists = state[platform].some(
+    (entry) => entry.problemNumber === item.problemNumber && entry.name === item.name
+  );
+
+  if (exists) {
+    form.reset();
+    platformSelect.value = platform;
+    return;
+  }
+
   state[platform].unshift(item);
-  addToTodo(item, false);
+  saveState();
+  renderAll();
   form.reset();
   platformSelect.value = platform;
 }
 
 function renderAll() {
-  renderProblemList(codeforcesList, state.codeforces);
-  renderProblemList(leetcodeList, state.leetcode);
-  renderTodo();
+  renderProblemList(codeforcesList, state.codeforces, 'codeforces');
+  renderProblemList(leetcodeList, state.leetcode, 'leetcode');
+  renderSummary();
 }
 
 function setActiveTab(tabName) {
@@ -350,7 +290,10 @@ function setActiveTab(tabName) {
   });
 }
 
-form.addEventListener('submit', addProblem);
+if (form) {
+  form.addEventListener('submit', addProblem);
+}
+
 tabButtons.forEach((button) => {
   button.addEventListener('click', () => setActiveTab(button.dataset.tab));
 });
