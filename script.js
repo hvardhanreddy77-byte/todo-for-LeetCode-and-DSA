@@ -139,11 +139,11 @@ function parseProblemReference(rawPlatform, rawProblemNumber, rawProblemName) {
     const platform = isCodeforces ? 'codeforces' : 'leetcode';
 
     const cfContestMatch = url.pathname.match(/\/contest\/(\d+)\/problem\/([A-Za-z0-9]+)/i);
-    const cfSetProblemMatch = url.pathname.match(/\/problemset\/problem\/([A-Za-z0-9]+)/i);
+    const cfSetProblemMatch = url.pathname.match(/\/problemset\/problem\/(\d+)(?:\/)?([A-Za-z0-9]+)?/i);
     const problemNumber = cfContestMatch
       ? `${cfContestMatch[1]}/${cfContestMatch[2]}`
       : cfSetProblemMatch
-        ? cfSetProblemMatch[1]
+        ? [cfSetProblemMatch[1], cfSetProblemMatch[2]].filter(Boolean).join('/')
         : (isCodeforces ? incomingNumber : '');
 
     const leetCodeMatch = url.pathname.match(/\/problems\/([^/]+)/i);
@@ -192,7 +192,13 @@ function createProblemUrl(platform, problemNumber, problemName) {
     }
 
     const cleanId = cleanedNumber.replace(/[^A-Za-z0-9]/g, '').trim();
-    if (/^\d+[A-Za-z]?$/.test(cleanId)) {
+    if (/^\d+[A-Za-z]$/.test(cleanId)) {
+      const contestId = cleanId.replace(/[A-Za-z]$/, '');
+      const problemKey = cleanId.slice(contestId.length);
+      return `https://codeforces.com/problemset/problem/${contestId}/${problemKey}`;
+    }
+
+    if (/^\d+$/.test(cleanId)) {
       return `https://codeforces.com/problemset/problem/${cleanId}`;
     }
 
