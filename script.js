@@ -91,6 +91,76 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+function toTitleCase(rawText) {
+  return String(rawText ?? '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function parseProblemReference(rawPlatform, rawProblemNumber, rawProblemName) {
+  const incomingNumber = String(rawProblemNumber ?? '').trim();
+  const incomingName = String(rawProblemName ?? '').trim();
+
+  const candidate = [incomingNumber, incomingName].find((value) => {
+    if (!value) return false;
+    return /https?:\/\//i.test(value) || /(?:codeforces|leetcode)\.com/i.test(value);
+  });
+
+  if (!candidate) {
+    return {
+      platform: rawPlatform,
+      problemNumber: incomingNumber,
+      name: incomingName
+    };
+  }
+
+  const value = candidate.trim();
+  const normalizedUrl = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+
+  try {
+    const url = new URL(normalizedUrl);
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+    const isCodeforces = hostname.includes('codeforces.com');
+    const isLeetCode = hostname.includes('leetcode.com');
+
+    if (!isCodeforces && !isLeetCode) {
+      return {
+        platform: rawPlatform,
+        problemNumber: incomingNumber,
+        name: incomingName
+      };
+    }
+
+    const platform = isCodeforces ? 'codeforces' : 'leetcode';
+
+    const cfMatch = url.pathname.match(/(?:problemset\/problem\/|contest\/\d+\/problem\/|problem\/)([A-Za-z0-9]+)/i);
+    const problemNumber = cfMatch ? cfMatch[1] : (isCodeforces ? incomingNumber : '');
+
+    const leetCodeMatch = url.pathname.match(/\/problems\/([^/]+)/i);
+    const slug = leetCodeMatch ? leetCodeMatch[1] : '';
+    const name = isLeetCode
+      ? toTitleCase(slug || incomingName || 'Problem')
+      : (incomingName || (problemNumber ? `Problem ${problemNumber}` : 'Problem'));
+
+    return {
+      platform,
+      problemNumber: problemNumber || incomingNumber,
+      name: name || incomingName || (problemNumber ? `Problem ${problemNumber}` : 'Problem')
+    };
+  } catch (error) {
+    return {
+      platform: rawPlatform,
+      problemNumber: incomingNumber,
+      name: incomingName
+    };
+  }
+}
+
 function createProblemUrl(platform, problemNumber, problemName) {
   const cleanedNumber = String(problemNumber ?? '').trim();
   const cleanedName = String(problemName ?? '').trim();
@@ -239,9 +309,13 @@ function deletePlatformProblem(platform, item) {
 function addProblem(event) {
   event.preventDefault();
 
-  const platform = platformSelect.value;
-  const problemNumber = problemNumberInput.value.trim();
-  const name = problemNameInput.value.trim();
+  const selectedPlatform = platformSelect.value;
+  const rawProblemNumber = problemNumberInput.value.trim();
+  const rawName = problemNameInput.value.trim();
+  const parsed = parseProblemReference(selectedPlatform, rawProblemNumber, rawName);
+  const platform = parsed.platform || selectedPlatform;
+  const problemNumber = parsed.problemNumber || rawProblemNumber;
+  const name = parsed.name || rawName || `Problem ${problemNumber}`;
 
   if (!problemNumber || !name) {
     return;
