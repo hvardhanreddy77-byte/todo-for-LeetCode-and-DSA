@@ -1,5 +1,61 @@
 const STORAGE_KEY = 'problem-portal-state';
 
+const LEETCODE_NUMBER_TO_SLUG = {
+  1: 'two-sum',
+  2: 'add-two-numbers',
+  3: 'longest-substring-without-repeating-characters',
+  4: 'median-of-two-sorted-arrays',
+  5: 'longest-palindromic-substring',
+  6: 'zigzag-conversion',
+  7: 'reverse-integer',
+  8: 'string-to-integer-atoi',
+  9: 'palindrome-number',
+  10: 'regular-expression-matching',
+  11: 'container-with-most-water',
+  12: 'integer-to-roman',
+  13: 'roman-to-integer',
+  14: 'longest-common-prefix',
+  15: '3sum',
+  16: '3sum-closest',
+  17: 'letter-combinations-of-a-phone-number',
+  18: '4sum',
+  19: 'remove-nth-node-from-end-of-list',
+  20: 'valid-parentheses',
+  21: 'merge-two-sorted-lists',
+  22: 'generate-parentheses',
+  23: 'merge-k-sorted-lists',
+  24: 'swap-nodes-in-pairs',
+  25: 'reverse-nodes-in-k-group',
+  26: 'remove-duplicates-from-sorted-array',
+  27: 'remove-element',
+  28: 'find-the-index-of-the-first-occurrence-in-a-string',
+  29: 'divide-two-integers',
+  30: 'substring-with-concatenation-of-all-words',
+  31: 'next-permutation',
+  32: 'longest-valid-parentheses',
+  33: 'search-in-rotated-sorted-array',
+  34: 'find-first-and-last-position-of-element-in-sorted-array',
+  35: 'search-insert-position',
+  36: 'valid-sudoku',
+  37: 'sudoku-solver',
+  38: 'count-and-say',
+  39: 'combination-sum',
+  40: 'combination-sum-ii',
+  41: 'first-missing-positive',
+  42: 'trapping-rain-water',
+  43: 'multiply-strings',
+  44: 'wildcard-matching',
+  45: 'jump-game-ii',
+  46: 'permutations',
+  47: 'permutations-ii',
+  48: 'rotate-image',
+  49: 'group-anagrams',
+  50: 'powx-n',
+  51: 'n-queens',
+  52: 'n-queens-ii',
+  1190: 'reverse-substrings-between-each-pair-of-parentheses'
+};
+
 const defaultProblems = {
   codeforces: [],
   leetcode: []
@@ -166,6 +222,29 @@ function parseProblemReference(rawPlatform, rawProblemNumber, rawProblemName) {
   }
 }
 
+function normalizeLeetCodeSlug(rawValue) {
+  const value = String(rawValue ?? '').trim();
+  if (!value) {
+    return '';
+  }
+
+  const cleaned = value
+    .replace(/^https?:\/\/[^\s]+\//i, '')
+    .replace(/^https?:\/\/[^\s]+/i, '')
+    .replace(/^\/+|\/+$/g, '')
+    .replace(/^leetcode\s*[:/-]?\s*/i, '')
+    .replace(/^problems?\s*[:/-]?\s*/i, '')
+    .replace(/^\d+\s*[.):-]\s*/i, '')
+    .replace(/^\d+\s+/i, '')
+    .replace(/[_\s]+/g, ' ')
+    .trim();
+
+  return String(cleaned)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function createProblemUrl(platform, problemNumber, problemName) {
   const cleanedNumber = String(problemNumber ?? '').trim();
   const cleanedName = String(problemName ?? '').trim();
@@ -214,15 +293,25 @@ function createProblemUrl(platform, problemNumber, problemName) {
     return 'https://codeforces.com/problemset';
   }
 
-  const slugSource = cleanedName || cleanedNumber || 'problem';
-  const slug = String(slugSource)
-    .toLowerCase()
-    .replace(/^https?:\/\/[^\s]+\//i, '')
-    .replace(/https?:\/\/[^\s]+/i, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || `problem-${cleanedNumber || 'new'}`;
+  const parsedNumber = Number.parseInt(cleanedNumber, 10);
+  const onlyDigits = /^\d+$/.test(cleanedNumber);
+  if (onlyDigits && LEETCODE_NUMBER_TO_SLUG[parsedNumber]) {
+    return `https://leetcode.com/problems/${LEETCODE_NUMBER_TO_SLUG[parsedNumber]}/`;
+  }
 
-  return `https://leetcode.com/problems/${slug}/`;
+  const slugSource = cleanedName || cleanedNumber || 'problem';
+  const slug = normalizeLeetCodeSlug(slugSource);
+
+  if (slug && /[aeiou]/i.test(slug) && slug.length >= 3) {
+    return `https://leetcode.com/problems/${slug}/`;
+  }
+
+  if (onlyDigits) {
+    return `https://leetcode.com/problemset/?search=${encodeURIComponent(cleanedNumber)}`;
+  }
+
+  const query = encodeURIComponent(cleanedName || cleanedNumber || 'leetcode problem');
+  return `https://leetcode.com/problemset/?search=${query}`;
 }
 
 function renderProblemList(listElement, problems, platform) {
@@ -348,15 +437,17 @@ function addProblem(event) {
   const problemNumber = parsed.problemNumber || rawProblemNumber;
   const name = parsed.name || rawName || `Problem ${problemNumber}`;
 
-  if (!problemNumber || !name) {
+  if (!problemNumber) {
     return;
   }
+
+  const finalName = name || (platform === 'leetcode' ? `Problem ${problemNumber}` : `Problem ${problemNumber}`);
 
   const item = {
     platform,
     problemNumber,
-    name,
-    url: createProblemUrl(platform, problemNumber, name),
+    name: finalName,
+    url: createProblemUrl(platform, problemNumber, finalName),
     completed: false
   };
 
