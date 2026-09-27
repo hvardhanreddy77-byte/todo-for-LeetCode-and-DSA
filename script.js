@@ -138,8 +138,13 @@ function parseProblemReference(rawPlatform, rawProblemNumber, rawProblemName) {
 
     const platform = isCodeforces ? 'codeforces' : 'leetcode';
 
-    const cfMatch = url.pathname.match(/(?:problemset\/problem\/|contest\/\d+\/problem\/|problem\/)([A-Za-z0-9]+)/i);
-    const problemNumber = cfMatch ? cfMatch[1] : (isCodeforces ? incomingNumber : '');
+    const cfContestMatch = url.pathname.match(/\/contest\/(\d+)\/problem\/([A-Za-z0-9]+)/i);
+    const cfSetProblemMatch = url.pathname.match(/\/problemset\/problem\/([A-Za-z0-9]+)/i);
+    const problemNumber = cfContestMatch
+      ? `${cfContestMatch[1]}/${cfContestMatch[2]}`
+      : cfSetProblemMatch
+        ? cfSetProblemMatch[1]
+        : (isCodeforces ? incomingNumber : '');
 
     const leetCodeMatch = url.pathname.match(/\/problems\/([^/]+)/i);
     const slug = leetCodeMatch ? leetCodeMatch[1] : '';
@@ -165,16 +170,33 @@ function createProblemUrl(platform, problemNumber, problemName) {
   const cleanedNumber = String(problemNumber ?? '').trim();
   const cleanedName = String(problemName ?? '').trim();
 
-  if (platform === 'codeforces') {
-    const normalized = cleanedNumber
-      .replace(/^(?:https?:\/\/)?(?:www\.)?codeforces\.com\/.*?problem(?:set)?\//i, '')
-      .replace(/[^A-Za-z0-9]/g, '')
-      .trim();
+  const directUrl = [cleanedNumber, cleanedName].find((value) => /(?:codeforces|leetcode)\.com/i.test(String(value ?? '')));
+  if (directUrl) {
+    try {
+      const parsed = new URL(/^https?:\/\//i.test(directUrl) ? directUrl : `https://${directUrl}`);
+      const hostname = parsed.hostname.toLowerCase().replace(/^www\./, '');
+      if (hostname.includes('codeforces.com') || hostname.includes('leetcode.com')) {
+        return parsed.href.replace(/[?#].*$/, '').replace(/\/$/, '/');
+      }
+    } catch (error) {
+      // fall through to standard generation below
+    }
+  }
 
-    if (/^\d+[A-Za-z]?$/.test(normalized)) {
-      return `https://codeforces.com/problemset/problem/${normalized}`;
+  if (platform === 'codeforces') {
+    if (cleanedNumber.includes('/')) {
+      const [contestId, problemKey] = cleanedNumber.split('/').map((part) => part.trim()).filter(Boolean);
+      if (contestId && problemKey) {
+        return `https://codeforces.com/contest/${contestId}/problem/${problemKey}`;
+      }
     }
 
+    const cleanId = cleanedNumber.replace(/[^A-Za-z0-9]/g, '').trim();
+    if (/^\d+[A-Za-z]?$/.test(cleanId)) {
+      return `https://codeforces.com/problemset/problem/${cleanId}`;
+    }
+
+    const normalized = cleanId;
     if (normalized) {
       return `https://codeforces.com/problemset?search=${encodeURIComponent(normalized)}`;
     }
@@ -186,8 +208,11 @@ function createProblemUrl(platform, problemNumber, problemName) {
     return 'https://codeforces.com/problemset';
   }
 
-  const slug = cleanedName
+  const slugSource = cleanedName || cleanedNumber || 'problem';
+  const slug = String(slugSource)
     .toLowerCase()
+    .replace(/^https?:\/\/[^\s]+\//i, '')
+    .replace(/https?:\/\/[^\s]+/i, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || `problem-${cleanedNumber || 'new'}`;
 
