@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Problem Portal</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <div class="app-shell">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Practice tracker</p>
+                <h1>Problem Portal</h1>
+            </div>
+        </header>
+
+        <nav class="tab-nav" aria-label="Main navigation">
+            <button type="button" class="tab-btn active" data-tab="home">Dashboard</button>
+            <button type="button" class="tab-btn" data-tab="analytics">Analytics</button>
+        </nav>
+
+        <main class="layout">
+            <section id="homeView" class="tab-view active">
+                <section class="panel form-panel">
+                    <h2>Add a Problem</h2>
+                    <form id="problemForm">
+                        <label>
+                            Platform
+                            <select id="platform" name="platform">
+                                <option value="codeforces">Codeforces</option>
+                                <option value="leetcode">LeetCode</option>
+                            </select>
+                        </label>
+
+                        <label>
+                            Problem Number / ID
+                            <input id="problemNumber" name="problemNumber" type="text" placeholder="Example: 1799A or 1"
+                                required />
+                        </label>
+
+                        <label>
+                            Problem Name
+                            <input id="problemName" name="problemName" type="text"
+                                placeholder="Example: Two Sum or A. Codeforces" required />
+                        </label>
+
+                        <button type="submit">Add to Todo</button>
+                    </form>
+                </section>
+
+                <section class="panel todo-panel">
+                    <div class="section-heading">
+                        <h2>Todo List</h2>
+                        <span class="badge" id="todoCount">0</span>
+                    </div>
+                    <ul id="todoList" class="problem-list todo-list"></ul>
+                </section>
+
+                <section class="platform-grid">
+                    <article class="panel platform-panel">
+                        <div class="section-heading">
+                            <h2>Codeforces</h2>
+                            <span class="badge" id="codeforcesCount">0</span>
+                        </div>
+                        <ul id="codeforcesList" class="problem-list"></ul>
+                    </article>
+
+                    <article class="panel platform-panel">
+                        <div class="section-heading">
+                            <h2>LeetCode</h2>
+                            <span class="badge" id="leetcodeCount">0</span>
+                        </div>
+                        <ul id="leetcodeList" class="problem-list"></ul>
+                    </article>
+                </section>
+            </section>
+
+            <section id="analyticsView" class="tab-view">
+                <section class="panel analytics-panel">
+                    <div class="section-heading">
+                        <h2>Analytics Summary</h2>
+                    </div>
+                    <div class="summary-grid">
+                        <div class="summary-card">
+                            <span>Total To Solve</span>
+                            <strong id="summaryTotal">0</strong>
+                        </div>
+                        <div class="summary-card">
+                            <span>Solved</span>
+                            <strong id="summarySolved">0</strong>
+                        </div>
+                        <div class="summary-card">
+                            <span>Remaining</span>
+                            <strong id="summaryRemaining">0</strong>
+                        </div>
+                        <div class="summary-card">
+                            <span>Codeforces</span>
+                            <strong id="summaryCodeforces">0</strong>
+                        </div>
+                        <div class="summary-card">
+                            <span>LeetCode</span>
+                            <strong id="summaryLeetcode">0</strong>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel chart-panel">
+                    <div class="section-heading">
+                        <h2>Progress Graph</h2>
+                    </div>
+                    <div class="chart" aria-label="Problem progress chart">
+                        <div class="bar-group">
+                            <span class="bar-label">Total</span>
+                            <div class="bar-wrap">
+                                <div id="barTotal" class="bar bar-total"></div>
+                            </div>
+                            <span id="barTotalValue" class="bar-value">0</span>
+                        </div>
+                        <div class="bar-group">
+                            <span class="bar-label">Solved</span>
+                            <div class="bar-wrap">
+                                <div id="barSolved" class="bar bar-solved"></div>
+                            </div>
+                            <span id="barSolvedValue" class="bar-value">0</span>
+                        </div>
+                        <div class="bar-group">
+                            <span class="bar-label">Remaining</span>
+                            <div class="bar-wrap">
+                                <div id="barRemaining" class="bar bar-remaining"></div>
+                            </div>
+                            <span id="barRemainingValue" class="bar-value">0</span>
+                        </div>
+                        <div class="bar-group">
+                            <span class="bar-label">CF</span>
+                            <div class="bar-wrap">
+                                <div id="barCodeforces" class="bar bar-codeforces"></div>
+                            </div>
+                            <span id="barCodeforcesValue" class="bar-value">0</span>
+                        </div>
+                        <div class="bar-group">
+                            <span class="bar-label">LC</span>
+                            <div class="bar-wrap">
+                                <div id="barLeetcode" class="bar bar-leetcode"></div>
+                            </div>
+                            <span id="barLeetcodeValue" class="bar-value">0</span>
+                        </div>
+                    </div>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
